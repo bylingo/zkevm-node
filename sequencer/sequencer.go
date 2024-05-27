@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	datastreamChannelMultiplier = 2
+	datastreamChannelBufferSize = 10
 )
 
 // Sequencer represents a sequencer
@@ -52,9 +52,7 @@ func New(cfg Config, batchCfg state.BatchConfig, poolCfg pool.Config, txPool txP
 		eventLog:  eventLog,
 	}
 
-	// TODO: Make configurable
-	channelBufferSize := 200 * datastreamChannelMultiplier // nolint:gomnd
-	sequencer.dataToStream = make(chan interface{}, channelBufferSize)
+	sequencer.dataToStream = make(chan interface{}, datastreamChannelBufferSize)
 
 	return sequencer, nil
 }
@@ -263,8 +261,6 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 			case state.DSL2FullBlock:
 				l2Block := data
 
-				//TODO: remove this log
-				log.Infof("[ds-debug] start atomic op for l2block %d", l2Block.L2BlockNumber)
 				err = s.streamServer.StartAtomicOp()
 				if err != nil {
 					log.Errorf("failed to start atomic op for l2block %d, error: %v ", l2Block.L2BlockNumber, err)
@@ -276,8 +272,6 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 					Value: l2Block.L2BlockNumber,
 				}
 
-				//TODO: remove this log
-				log.Infof("[ds-debug] add stream bookmark for l2block %d", l2Block.L2BlockNumber)
 				marshalledBookMark, err := proto.Marshal(bookMark)
 				if err != nil {
 					log.Errorf("failed to marshal bookmark for l2block %d, error: %v", l2Block.L2BlockNumber, err)
@@ -298,8 +292,6 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 						Value: l2Block.L2BlockNumber - 1,
 					}
 
-					//TODO: remove this log
-					log.Infof("[ds-debug] get previous l2block %d", l2Block.L2BlockNumber-1)
 					marshalledBookMark, err := proto.Marshal(bookMark)
 					if err != nil {
 						log.Errorf("failed to marshal bookmark for l2block %d, error: %v", l2Block.L2BlockNumber, err)
@@ -339,16 +331,12 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 					continue
 				}
 
-				//TODO: remove this log
-				log.Infof("[ds-debug] add l2blockStart stream entry for l2block %d", l2Block.L2BlockNumber)
 				_, err = s.streamServer.AddStreamEntry(datastreamer.EntryType(datastream.EntryType_ENTRY_TYPE_L2_BLOCK), marshalledL2Block)
 				if err != nil {
 					log.Errorf("failed to add stream entry for l2block %d, error: %v", l2Block.L2BlockNumber, err)
 					continue
 				}
 
-				//TODO: remove this log
-				log.Infof("[ds-debug] adding l2tx stream entries for l2block %d", l2Block.L2BlockNumber)
 				for _, l2Transaction := range l2Block.Txs {
 					streamL2Transaction := &datastream.Transaction{
 						L2BlockNumber:               l2Transaction.L2BlockNumber,
@@ -371,17 +359,11 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 					}
 				}
 
-				//TODO: remove this log
-				log.Infof("[ds-debug] commit atomic op for l2block %d", l2Block.L2BlockNumber)
 				err = s.streamServer.CommitAtomicOp()
 				if err != nil {
 					log.Errorf("failed to commit atomic op for l2block %d, error: %v ", l2Block.L2BlockNumber, err)
 					continue
 				}
-
-				//TODO: remove this log
-				log.Infof("[ds-debug] l2block %d sent to datastream", l2Block.L2BlockNumber)
-
 			// Stream a bookmark
 			case datastream.BookMark:
 				err = s.streamServer.StartAtomicOp()
@@ -464,6 +446,8 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 				log.Errorf("invalid stream message type received")
 			}
 		}
+
+		s.finalizer.DatastreamChannelCountAdd(-1)
 	}
 }
 
