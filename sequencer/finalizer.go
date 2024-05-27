@@ -887,7 +887,7 @@ func (f *finalizer) logZKCounters(counters state.ZKCounters) string {
 }
 
 // Decrease datastreamChannelCount variable
-func (f *finalizer) DatastreamChannelCountAdd(ct int32) {
+func (f *finalizer) DataToStreamChannelCountAdd(ct int32) {
 	f.dataToStreamCount.Add(ct)
 }
 

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	datastreamChannelBufferSize = 10
+	datastreamChannelBufferSize = 20
 )
 
 // Sequencer represents a sequencer
@@ -255,6 +255,8 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 		// Read data from channel
 		dataStream := <-s.dataToStream
 
+		s.finalizer.DataToStreamChannelCountAdd(-1)
+
 		if s.streamServer != nil {
 			switch data := dataStream.(type) {
 			// Stream a complete L2 block with its transactions
@@ -446,8 +448,6 @@ func (s *Sequencer) sendDataToStreamer(chainID uint64) {
 				log.Errorf("invalid stream message type received")
 			}
 		}
-
-		s.finalizer.DatastreamChannelCountAdd(-1)
 	}
 }
 
